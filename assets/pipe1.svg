@@ -1,0 +1,20 @@
+<!-- pipe1.svg - Top Pipe (Neon Purple) -->
+<svg width="80" height="1000" viewBox="0 0 80 1000" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9B30FF" />
+      <stop offset="50%" stop-color="#D4A0FF" />
+      <stop offset="100%" stop-color="#6A0DAD" />
+    </linearGradient>
+    <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#9B30FF" flood-opacity="0.8" />
+      <feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="#9B30FF" flood-opacity="0.6" />
+      <feDropShadow dx="0" dy="0" stdDeviation="25" flood-color="#9B30FF" flood-opacity="0.4" />
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="80" height="1000" fill="url(#neonGradient)" filter="url(#neonGlow)" />
+  <!-- Bottom cap -->
+  <rect x="0" y="80" width="80" height="80" fill="url(#neonGradient)" opacity="0.9" />
+  <!-- Top cap -->
+  <rect x="0" y="920" width="80" height="80" fill="url(#neonGradient)" opacity="0.9" />
+</svg>
