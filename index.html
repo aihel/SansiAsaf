@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sansi Asaf Proje</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      background: #000;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #background-video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -2;
+      filter: blur(4px);
+    }
+
+    #music-audio {
+      display: none;
+    }
+
+    .start-screen, .game-over-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      backdrop-filter: blur(12px);
+      background: rgba(10, 10, 20, 0.7);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .start-screen h1, .game-over-screen h1 {
+      font-size: 4rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+      text-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff;
+      color: #00ffff;
+      letter-spacing: 2px;
+    }
+
+    .start-screen p, .game-over-screen p {
+      font-size: 1.5rem;
+      margin-bottom: 30px;
+      color: #fff;
+      text-shadow: 0 0 10px #00ffff;
+    }
+
+    .start-screen .subtitle, .game-over-screen .subtitle {
+      font-size: 1.2rem;
+      color: #00ffff;
+      opacity: 0.8;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 1; }
+    }
+
+    .score-display {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #00ffff;
+      text-shadow: 0 0 15px #00ffff;
+      margin-bottom: 10px;
+    }
+
+    .best-score {
+      font-size: 1.2rem;
+      color: #ff00ff;
+      text-shadow: 0 0 10px #ff00ff;
+      margin-bottom: 20px;
+    }
+
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0.8;
+      filter: blur(1px);
+      animation: float 3s infinite ease-out;
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 0.8;
+      }
+      100% {
+        transform: translateY(-100vh) rotate(360deg);
+        opacity: 0;
+      }
+    }
+
+    .neon-glow {
+      filter: drop-shadow(0 0 5px #00ffff) drop-shadow(0 0 10px #00ffff) drop-shadow(0 0 15px #00ffff);
+    }
+
+    .neon-glow-pipe {
+      filter: drop-shadow(0 0 8px #ff00ff) drop-shadow(0 0 15px #ff00ff) drop-shadow(0 0 20px #ff00ff);
+    }
+
+    .neon-glow-text {
+      text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 15px #00ffff;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <video id="background-video" autoplay loop muted>
+      <source src="smol-stelle-honkai-star-rail.1920x1080.mp4" type="video/mp4">
+    </video>
+    <audio id="music-audio" loop>
+      <source src="88.m4a" type="audio/m4a">
+    </audio>
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Başlangıç Ekranı -->
+    <div class="start-screen" id="start-screen">
+      <h1 class="neon-glow">NEON FLAPPY</h1>
+      <p class="subtitle">Basma ile Başla</p>
+      <div id="intro-text" style="font-size: 1.5rem; margin-top: 20px; color: #00ffff;"></div>
+    </div>
+
+    <!-- Oyun Bitti Ekranı -->
+    <div class="game-over-screen" id="game-over-screen" style="display: none;">
+      <h1 class="neon-glow">OYUN BİTTİ</h1>
+      <div class="score-display" id="final-score">Skor: 0</div>
+      <div class="best-score" id="best-score">En İyi: 0</div>
+      <p class="subtitle">Yeniden Başlatmak İçin Dokun</p>
+    </div>
+  </div>
+
+  <script>
+    // Oyun başlatma
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    const backgroundVideo = document.getElementById('background-video');
+    const musicAudio = document.getElementById('music-audio');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const finalScoreEl = document.getElementById('final-score');
+    const bestScoreEl = document.getElementById('best-score');
+    const introTextEl = document.getElementById('intro-text');
+
+    // Canvastaki boyutları ayarla
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Oyun durumu
+    let gameActive = false;
+    let score = 0;
+    let bestScore = localStorage.getItem('neonFlappyBestScore') || 0;
+    let animationId;
+    let particles = ;
+
+    // Kuş
+    const bird = {
+      x: canvas.width * 0.2,
+      y: canvas.height / 2,
+      width: 40,
+      height: 30,
+      velocity: 0,
+      gravity: 0.6,
+      jumpForce: -10,
+      rotation: 0,
+      frames: ,
+      currentFrame: 0,
+      frameTimer: 0,
+      frameInterval: 100 // ms aralıklarla çerçeve değişimi
+    };
+
+    // Borular
+    const pipes = ;
+    const pipeWidth = 80;
+    const pipeGap = 190;
+    const pipeSpeed = 3;
+    const pipeSpawnInterval = 1800; // ms
+    let lastPipeSpawn = 0;
+
+    // Kuşun çerçevelerini yükle
+    function loadBirdFrames() {
+      const frameUrls = ['1.png', '2.png', '3.png'];
+      frameUrls.forEach((url, index) => {
+        const img = new Image();
+        img.src = url;
+        img.onload = () => {
+          bird.frames[index] = img;
+        };
+      });
+    }
+
+    // SVG borularını yükle
+    function loadPipeSVG() {
+      const pipeSVG = `
+        <svg width="\${pipeWidth}" height="100%" viewBox="0 0 \${pipeWidth} 1000" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="\${pipeWidth}" height="1000" fill="#00ff00" opacity="0.8" />
+          <rect x="0" y="0" width="\${pipeWidth}" height="100" fill="#00ff00" opacity="0.9" />
+          <rect x="0" y="900" width="\${pipeWidth}" height="100" fill="#00ff00" opacity="0.9" />
+        </svg>
+      `;
+      const pipe1SVG = `
+        <svg width="\${pipeWidth}" height="100%" viewBox="0 0 \${pipeWidth} 1000" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="\${pipeWidth}" height="1000" fill="#ff0000" opacity="0.8" />
+          <rect x="0" y="0" width="\${pipeWidth}" height="100" fill="#ff0000" opacity="0.9" />
+          <rect x="0" y="900" width="\${pipeWidth}" height="100" fill="#ff0000" opacity="0.9" />
+        </svg>
+      `;
+
+      const pipeBlob = new Blob([pipeSVG], { type: 'image/svg+xml' });
+      const pipe1Blob = new Blob([pipe1SVG], { type: 'image/svg+xml' });
+      
+      const pipeUrl = URL.createObjectURL(pipeBlob);
+      const pipe1Url = URL.createObjectURL(pipe1Blob);
+      
+      const pipeImg = new Image();
+      const pipe1Img = new Image();
+      
+      pipeImg.src = pipeUrl;
+      pipe1Img.src = pipe1Url;
+      
+      pipeImg.onload = () => {
+        bird.pipeImg = pipeImg;
+      };
+      pipe1Img.onload = () => {
+        bird.pipe1Img = pipe1Img;
+      };
+    }
+
+    // Parçacık oluştur
+    function createParticle(x, y) {
+      const particle = document.createElement('div');
+      particle.classList.add('particle');
+      particle.style.left = `\${x}px`;
+      particle.style.top = `\${y}px`;
+      particle.style.backgroundColor = `hsl(\${Math.random() * 360}, 100%, 70%)`;
+      document.body.appendChild(particle);
+      particles.push(particle);
+    }
+
+    // Parçacıkları güncelle
+    function updateParticles() {
+      particles.forEach((p, i) => {
+        const currentY = parseFloat(p.style.top);
+        p.style.top = `\${currentY - 1}px`;
+        if (currentY < -10) {
+          p.remove();
+          particles.splice(i, 1);
+        }
+      });
+    }
+
+    // Kuşu çiz
+    function drawBird() {
+      // Hıza göre çerçeve değiştir
+      if (bird.velocity < -2) {
+        bird.currentFrame = 1; // 2.png - yukarı
+      } else if (bird.velocity > 2) {
+        bird.currentFrame = 2; // 3.png - aşağı
+      } else {
+        bird.currentFrame = 0; // 1.png - durak
+      }
+
+      // Hıza göre döndürme
+      bird.rotation = Math.min(Math.max(bird.velocity * 3, -30), 30);
+
+      // Kuşu çiz
+      ctx.save();
+      ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
+      ctx.rotate(bird.rotation * Math.PI / 180);
+      ctx.drawImage(
+        bird.frames[bird.currentFrame],
+        -bird.width / 2,
+        -bird.height / 2,
+        bird.width,
+        bird.height
+      );
+      ctx.restore();
+
+      // Neon ışık efekti
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 15;
+      ctx.drawImage(
+        bird.frames[bird.currentFrame],
+        bird.x,
+        bird.y,
+        bird.width,
+        bird.height
+      );
+      ctx.shadowBlur = 0;
+    }
+
+    // Boruları çiz
+    function drawPipes() {
+      pipes.forEach(pipe => {
+        // Üst boru
+        ctx.save();
+        ctx.translate(pipe.x + pipeWidth / 2, pipe.topY + pipe.height / 2);
+        ctx.rotate(Math.PI);
+        ctx.drawImage(
+          bird.pipe1Img,
+          -pipeWidth / 2,
+          -pipe.height / 2,
+          pipeWidth,
+          pipe.height
+        );
+        ctx.restore();
+
+        // Alt boru
+        ctx.drawImage(
+          bird.pipeImg,
+          pipe.x,
+          pipe.bottomY,
+          pipeWidth,
+          pipe.height
+        );
+
+        // Neon ışık efekti
+        ctx.shadowColor = '#ff00ff';
+        ctx.shadowBlur = 20;
+        ctx.drawImage(
+          bird.pipe1Img,
+          pipe.x,
+          pipe.topY,
+          pipeWidth,
+          pipe.height
+        );
+        ctx.drawImage(
+          bird.pipeImg,
+          pipe.x,
+          pipe.bottomY,
+          pipeWidth,
+          pipe.height
+        );
+        ctx.shadowBlur = 0;
+      });
+    }
+
+    // Skoru çiz
+    function drawScore() {
+      ctx.font = 'bold 48px Arial';
+      ctx.fillStyle = '#00ffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(score.toString(), canvas.width / 2, 100);
+
+      // Neon ışık efekti
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 15;
+      ctx.fillText(score.toString(), canvas.width / 2, 100);
+      ctx.shadowBlur = 0;
+    }
+
+    // Yeni boru oluştur
+    function spawnPipe() {
+      const gapY = Math.random() * (canvas.height - pipeGap - 200) + 100;
+      pipes.push({
+        x: canvas.width,
+        topY: 0,
+        bottomY: gapY + pipeGap,
+        height: canvas.height - gapY - pipeGap,
+        passed: false
+      });
+    }
+
+    // Oyun durumunu güncelle
+    function update() {
+      if (!gameActive) return;
+
+      // Kuşu güncelle
+      bird.velocity += bird.gravity;
+      bird.y += bird.velocity;
+
+      // Boruları güncelle
+      for (let i = pipes.length - 1; i >= 0; i--) {
+        const pipe = pipes[i];
+        pipe.x -= pipeSpeed;
+
+        // Kuş boruyu geçti mi?
+        if (!pipe.passed && pipe.x + pipeWidth < bird.x) {
+          pipe.passed = true;
+          score++;
+          createParticle(pipe.x + pipeWidth / 2, pipe.topY + pipe.height / 2);
+          createParticle(pipe.x + pipeWidth / 2, pipe.bottomY + pipe.height / 2);
+        }
+
+        // Ekranın dışında kalan boruları kaldır
+        if (pipe.x + pipeWidth < 0) {
+          pipes.splice(i, 1);
+        }
+      }
+
+      // Yeni boru oluştur
+      if (Date.now() - lastPipeSpawn > pipeSpawnInterval) {
+        spawnPipe();
+        lastPipeSpawn = Date.now();
+      }
+
+      // Çarpışma kontrolü
+      if (bird.y < 0 || bird.y + bird.height > canvas.height) {
+        gameOver();
+      }
+
+      for (const pipe of pipes) {
+        if (
+          bird.x + bird.width > pipe.x &&
+          bird.x < pipe.x + pipeWidth &&
+          (bird.y < pipe.topY + pipe.height || bird.y + bird.height > pipe.bottomY)
+        ) {
+          gameOver();
+          break;
+        }
+      }
+
+      // Parçacıkları güncelle
+      updateParticles();
+    }
+
+    // Oyun bitti
+    function gameOver() {
+      gameActive = false;
+      if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem('neonFlappyBestScore', bestScore);
+      }
+      finalScoreEl.textContent = `Skor: \${score}`;
+      bestScoreEl.textContent = `En İyi: \${bestScore}`;
+      gameOverScreen.style.display = 'flex';
+    }
+
+    // Oyunu başlat
+    function startGame() {
+      if (gameActive) return;
+      gameActive = true;
+      score = 0;
+      bird.y = canvas.height / 2;
+      bird.velocity = 0;
+      pipes.length = 0;
+      lastPipeSpawn = Date.now();
+      startScreen.style.display = 'none';
+      gameOverScreen.style.display = 'none';
+      musicAudio.play().catch(e => console.log("Ses oynatma başarısız:", e));
+      animate();
+    }
+
+    // Animasyon döngüsü
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Arka plan videosunu çiz
+      ctx.drawImage(backgroundVideo, 0, 0, canvas.width, canvas.height);
+      
+      // Oyun öğelerini çiz
+      drawPipes();
+      drawBird();
+      drawScore();
+      
+      // Oyun durumunu güncelle
+      update();
+      
+      // Animasyonu devam ettir
+      animationId = requestAnimationFrame(animate);
+    }
+
+    // Giriş metni animasyonu
+    function showIntroText() {
+      const texts = [
+        "Omer Asaf",
+        "Tarafından geliştirildi",
+        "Matematik projesi"
+      ];
+      
+      let index = 0;
+      introTextEl.textContent = texts[index];
+      
+      const interval = setInterval(() => {
+        index = (index + 1) % texts.length;
+        introTextEl.textContent = texts[index];
+      }, 2000);
+      
+      setTimeout(() => {
+        clearInterval(interval);
+        setTimeout(() => {
+          startScreen.style.display = 'flex';
+        }, 1000);
+      }, 6000);
+    }
+
+    // Olay dinleyicileri
+    document.addEventListener('click', () => {
+      if (!gameActive) {
+        startGame();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !gameActive) {
+        startGame();
+      }
+    });
+
+    // Dokunma desteği
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (!gameActive) {
+        startGame();
+      }
+    });
+
+    // Oyunu başlat
+    loadBirdFrames();
+    loadPipeSVG();
+    showIntroText();
+
+    // Başlangıç parçacıkları ekle
+    for (let i = 0; i < 20; i++) {
+      createParticle(
+        Math.random() * canvas.width,
+        Math.random() * canvas.height
+      );
+    }
+  </script>
+</body>
+</html>
